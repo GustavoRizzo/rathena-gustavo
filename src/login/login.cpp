@@ -253,6 +253,8 @@ int32 login_mmo_auth_new(const char* userid, const char* pass, const char sex, c
 	safestrncpy(acc.userid, userid, sizeof(acc.userid));
 	safestrncpy(acc.pass, pass, sizeof(acc.pass));
 	acc.sex = sex;
+	// Single-player local server: every auto-created account gets full admin permissions.
+	acc.group_id = 99;
 	safestrncpy(acc.email, "a@a.com", sizeof(acc.email));
 	acc.expiration_time = ( login_config.start_limited_time != -1 ) ? time(nullptr) + login_config.start_limited_time : 0;
 	safestrncpy(acc.lastlogin, "", sizeof(acc.lastlogin));
@@ -343,8 +345,11 @@ int32 login_mmo_auth(struct login_session_data* sd, bool isServer) {
 	}
 
 	if( !accounts->load_str(accounts, &acc, sd->userid) ) {
-		ShowNotice("Unknown account (account: %s, ip: %s)\n", sd->userid, ip);
-		return 0; // 0 = Unregistered ID
+		// Single-player local server: auto-create any unknown account instead of rejecting it.
+		if( login_mmo_auth_new(sd->userid, sd->passwd, 'M', ip) != -1 || !accounts->load_str(accounts, &acc, sd->userid) ) {
+			ShowNotice("Unknown account (account: %s, ip: %s)\n", sd->userid, ip);
+			return 0; // 0 = Unregistered ID
+		}
 	}
 
 	if( !isServer && sex_str2num( acc.sex ) == SEX_SERVER ){
@@ -352,9 +357,9 @@ int32 login_mmo_auth(struct login_session_data* sd, bool isServer) {
 		return 0; // 0 = Unregistered ID
 	}
 
+	// Single-player local server: skip password verification, any password is accepted.
 	if( !login_check_password( *sd, acc ) ) {
-		ShowNotice("Invalid password (account: '%s', ip: %s)\n", sd->userid, ip);
-		return 1; // 1 = Incorrect Password
+		ShowNotice("Password mismatch ignored, single-player bypass (account: '%s', ip: %s)\n", sd->userid, ip);
 	}
 
 	if( acc.expiration_time != 0 && acc.expiration_time < time(nullptr) ) {

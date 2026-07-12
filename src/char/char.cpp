@@ -1409,14 +1409,20 @@ int32 char_make_new_char( struct char_session_data* sd, char* name_, int32 str, 
 	memcpy( tmp_start_point, charserv_config.start_point, sizeof( tmp_start_point ) );
 	memcpy(tmp_start_items, charserv_config.start_items, MAX_STARTITEM * sizeof(struct startitem));
 
+	ShowDebug( "DEBUG MAKECHAR: name='%s' slot=%d hair_color=%d hair_style=%d start_job=%d sex=%d str=%d agi=%d vit=%d int=%d dex=%d luk=%d char_slots=%d\n",
+		name, slot, hair_color, hair_style, start_job, sex, str, agi, vit, int_, dex, luk, sd->char_slots );
+
 	flag = char_check_char_name(name,esc_name);
-	if( flag < 0 )
+	if( flag < 0 ){
+		ShowDebug( "DEBUG MAKECHAR: rejected by char_check_char_name, flag=%d\n", flag );
 		return flag;
+	}
 
 	// Check inputs from the client - never trust it!
 
 	// Check the slot
 	if( slot < 0 || slot >= sd->char_slots ){
+		ShowDebug( "DEBUG MAKECHAR: rejected, invalid slot\n" );
 		return -4; // invalid slot
 	}
 
@@ -1464,18 +1470,24 @@ int32 char_make_new_char( struct char_session_data* sd, char* name_, int32 str, 
 	if( SQL_ERROR == Sql_Query(sql_handle, "SELECT 1 FROM `%s` WHERE `account_id` = '%d'", schema_config.char_db, sd->account_id) )
 		Sql_ShowDebug(sql_handle);
 #ifdef VIP_ENABLE
-	if( Sql_NumRows(sql_handle) >= MAX_CHARS )
+	if( Sql_NumRows(sql_handle) >= MAX_CHARS ){
+		ShowDebug( "DEBUG MAKECHAR: rejected, account char limit exceeded (VIP_ENABLE)\n" );
 		return -2; // character account limit exceeded
+	}
 #else
-	if( Sql_NumRows(sql_handle) >= sd->char_slots )
+	if( Sql_NumRows(sql_handle) >= sd->char_slots ){
+		ShowDebug( "DEBUG MAKECHAR: rejected, account char limit exceeded (%d rows >= %d slots)\n", (int)Sql_NumRows(sql_handle), sd->char_slots );
 		return -2; // character account limit exceeded
+	}
 #endif
 
 	// check char slot
 	if( SQL_ERROR == Sql_Query(sql_handle, "SELECT 1 FROM `%s` WHERE `account_id` = '%d' AND `char_num` = '%d' LIMIT 1", schema_config.char_db, sd->account_id, slot) )
 		Sql_ShowDebug(sql_handle);
-	if( Sql_NumRows(sql_handle) > 0 )
+	if( Sql_NumRows(sql_handle) > 0 ){
+		ShowDebug( "DEBUG MAKECHAR: rejected, slot already in use\n" );
 		return -2; // slot already in use
+	}
 
 	// validation success, log result
 	if (charserv_config.log_char) {
@@ -1486,9 +1498,8 @@ int32 char_make_new_char( struct char_session_data* sd, char* name_, int32 str, 
 	}
 
 #if PACKETVER >= 20151001
-	if(!(start_job == JOB_NOVICE && (charserv_config.allowed_job_flag&1)) && 
-		!(start_job == JOB_SUMMONER && (charserv_config.allowed_job_flag&2)))
-		return -2; // Invalid job
+	// Single-player local server: client allows picking any starting class (custom feature),
+	// so job validation against allowed_job_flag (which only permits Novice/Summoner) is skipped.
 
 	// Check for Doram based information.
 	if (start_job == JOB_SUMMONER) { // Check for just this job for now.
