@@ -15,11 +15,18 @@ MAP           ?= prontera
 X             ?= 155
 Y             ?= 185
 
+# Pasta de dumps: não versionada (ver .gitignore), fica ao lado deste Makefile
+# independente de onde o `make` for chamado.
+MK_DIR        := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+DUMP_DIR      := $(MK_DIR)dumps
+TIMESTAMP     := $(shell date +%Y%m%d_%H%M%S)
+FILE          ?= $(DUMP_DIR)/ragnarok_$(TIMESTAMP).sql
+
 define SQL_EXEC
 docker exec $(DB_CONTAINER) mariadb -u$(DB_USER) -p$(DB_PASS) $(DB_NAME) -e
 endef
 
-.PHONY: new-char reset-positions list-chars help
+.PHONY: new-char reset-positions list-chars db-dump db-restore help
 
 help:
 	@echo "Alvos disponiveis:"
@@ -29,6 +36,10 @@ help:
 	@echo "      Reseta a posicao (last_map/save_map) de TODOS os personagens de TODAS as contas."
 	@echo "  make -f tools/docker/dev.mk list-chars"
 	@echo "      Lista personagens existentes (char_id, conta, nome, mapa)."
+	@echo "  make -f tools/docker/dev.mk db-dump [FILE=caminho.sql]"
+	@echo "      Salva um dump completo do banco em tools/docker/dumps/ (pasta nao versionada)."
+	@echo "  make -f tools/docker/dev.mk db-restore FILE=caminho.sql"
+	@echo "      Restaura o banco a partir de um dump (sobrescreve os dados atuais)."
 
 new-char:
 	@$(SQL_EXEC) "INSERT INTO \`char\` \
@@ -49,3 +60,16 @@ reset-positions:
 
 list-chars:
 	@$(SQL_EXEC) "SELECT char_id, account_id, char_num, name, last_map, last_x, last_y FROM \`char\` ORDER BY account_id, char_num;"
+
+db-dump:
+	@mkdir -p $(DUMP_DIR)
+	@docker exec $(DB_CONTAINER) mariadb-dump -u$(DB_USER) -p$(DB_PASS) --single-transaction --routines --triggers $(DB_NAME) > $(FILE)
+	@echo "Dump salvo em $(FILE)"
+
+db-restore:
+ifndef FILE
+	$(error Informe FILE=caminho.sql, ex: make -f tools/docker/dev.mk db-restore FILE=tools/docker/dumps/ragnarok_20260101_120000.sql)
+endif
+	@test -f $(FILE) || (echo "Arquivo nao encontrado: $(FILE)"; exit 1)
+	@docker exec -i $(DB_CONTAINER) mariadb -u$(DB_USER) -p$(DB_PASS) $(DB_NAME) < $(FILE)
+	@echo "Banco restaurado a partir de $(FILE)"

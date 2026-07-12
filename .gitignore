@@ -1,5 +1,8 @@
 autom4te.cache/
 
+# dumps de banco gerados por tools/docker/dev.mk (db-dump/db-restore)
+/tools/docker/dumps/
+
 #Global
 .cache
 .idea
