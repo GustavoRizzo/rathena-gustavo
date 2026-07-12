@@ -18,18 +18,29 @@ Y             ?= 185
 # Pasta de dumps: não versionada (ver .gitignore), fica ao lado deste Makefile
 # independente de onde o `make` for chamado.
 MK_DIR        := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+REPO_DIR      := $(abspath $(MK_DIR)../..)
 DUMP_DIR      := $(MK_DIR)dumps
 TIMESTAMP     := $(shell date +%Y%m%d_%H%M%S)
 FILE          ?= $(DUMP_DIR)/ragnarok_$(TIMESTAMP).sql
+
+COMPOSE       := docker compose -f $(MK_DIR)docker-compose.yml -f $(MK_DIR)docker-compose.override.yml
+# Containers realmente necessários para jogar (db + os 4 servidores).
+# Não inclui o builder, que só roda sob demanda no alvo "build".
+APP_SERVICES  := db login char map web
 
 define SQL_EXEC
 docker exec $(DB_CONTAINER) mariadb -u$(DB_USER) -p$(DB_PASS) $(DB_NAME) -e
 endef
 
-.PHONY: new-char reset-positions list-chars db-dump db-restore help
+.PHONY: build up new-char reset-positions list-chars db-dump db-restore help
 
 help:
 	@echo "Alvos disponiveis:"
+	@echo "  make -f tools/docker/dev.mk build"
+	@echo "      Recompila os binarios do servidor do zero (login/char/map/web-server)."
+	@echo "      Usar sempre que mudar codigo em src/ ou o packetver."
+	@echo "  make -f tools/docker/dev.mk up"
+	@echo "      Sobe so os containers necessarios pra jogar: $(APP_SERVICES)."
 	@echo "  make -f tools/docker/dev.mk new-char NAME=Foo SLOT=1 [ACCOUNT_ID=2000000]"
 	@echo "      Cria um personagem novo direto no banco (sem passar pela tela de criacao)."
 	@echo "  make -f tools/docker/dev.mk reset-positions [MAP=prontera X=155 Y=185]"
@@ -40,6 +51,20 @@ help:
 	@echo "      Salva um dump completo do banco em tools/docker/dumps/ (pasta nao versionada)."
 	@echo "  make -f tools/docker/dev.mk db-restore FILE=caminho.sql"
 	@echo "      Restaura o banco a partir de um dump (sobrescreve os dados atuais)."
+
+build:
+	@echo "Parando login/char/map/web..."
+	@$(COMPOSE) stop login char map web
+	@echo "Removendo binarios antigos para forcar recompilacao completa..."
+	@rm -f $(REPO_DIR)/login-server $(REPO_DIR)/char-server $(REPO_DIR)/map-server $(REPO_DIR)/web-server
+	@$(COMPOSE) rm -f builder
+	@echo "Compilando (pode levar de 5 a 15 minutos na primeira vez apos mudar o packetver)..."
+	@$(COMPOSE) run --rm builder
+	@echo "Build concluido. Rode 'make -f tools/docker/dev.mk up' para subir os servidores."
+
+up:
+	@$(COMPOSE) up -d $(APP_SERVICES)
+	@$(COMPOSE) ps $(APP_SERVICES)
 
 new-char:
 	@$(SQL_EXEC) "INSERT INTO \`char\` \
