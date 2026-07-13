@@ -1,0 +1,19 @@
+//===== rAthena Script =======================================
+//= Auto Platinum Skills + Auto Identify (single-player)
+//===== Description: =========================================
+//= A cada login: concede as "platinum skills" (skills normalmente
+//= obtidas via quest, ex: Primeiros Socorros) e identifica qualquer
+//= item ainda nao identificado no inventario (itens novos ja nascem
+//= identificados por causa do patch em itemdb_isidentified, isso aqui
+//= so cobre itens antigos que ficaram parados sem identificar).
+//= Idempotente, seguro de rodar em todo login.
+//=============================================================
+
+-	script	AutoPlatinumSkills	-1,{
+	end;
+
+OnPCLoginEvent:
+	callfunc "F_GetPlatinumSkills";
+	identifyall();
+	end;
+}

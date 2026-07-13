@@ -1,7 +1,7 @@
 services:
     builder:
         environment:
-            BUILDER_CONFIGURE: "--enable-packetver=20200902"
+            BUILDER_CONFIGURE: "--enable-packetver=20200401"
 
     web:
         image: "rathena:local"

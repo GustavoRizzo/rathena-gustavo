@@ -3341,16 +3341,9 @@ bool itemdb_ishatched_egg( const item* item ) {
 * @param nameid ID of item
 */
 char itemdb_isidentified(t_itemid nameid) {
-	int32 type=itemdb_type(nameid);
-	switch (type) {
-		case IT_WEAPON:
-		case IT_ARMOR:
-		case IT_PETARMOR:
-		case IT_SHADOWGEAR:
-			return 0;
-		default:
-			return 1;
-	}
+	// Single-player local server: every item drops already identified,
+	// no need to use a Magnifier / Novice identify skill.
+	return 1;
 }
 
 const std::string ItemGroupDatabase::getDefaultLocation() {

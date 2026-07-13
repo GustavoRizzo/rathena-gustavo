@@ -1498,8 +1498,14 @@ int32 char_make_new_char( struct char_session_data* sd, char* name_, int32 str, 
 	}
 
 #if PACKETVER >= 20151001
-	// Single-player local server: client allows picking any starting class (custom feature),
-	// so job validation against allowed_job_flag (which only permits Novice/Summoner) is skipped.
+	// Single-player local server: client allows picking any starting class (custom feature).
+	// allowed_job_flag (which only permits Novice/Summoner) is skipped, but we still reject
+	// job IDs that aren't real playable classes (e.g. monster class IDs), otherwise the
+	// character ends up with no MaxBaseLevel entry in job_db and gets stuck leveling.
+	if( start_job >= JOB_MAX_BASIC && start_job != JOB_SUMMONER ){
+		ShowDebug( "DEBUG MAKECHAR: rejected, start_job=%d is not a valid playable class\n", start_job );
+		return -2; // Invalid job
+	}
 
 	// Check for Doram based information.
 	if (start_job == JOB_SUMMONER) { // Check for just this job for now.
