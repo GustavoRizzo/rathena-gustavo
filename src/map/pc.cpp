@@ -8244,8 +8244,13 @@ int32 pc_follow(map_session_data *sd,int32 target_id)
 int32 pc_checkbaselevelup(map_session_data *sd) {
 	t_exp next = pc_nextbaseexp(sd);
 
-	if (!next || sd->status.base_exp < next || pc_is_maxbaselv(sd))
+	if (!next || sd->status.base_exp < next || pc_is_maxbaselv(sd)) {
+		ShowDebug( "DEBUG LEVELUP: name='%s' class=%d base_level=%d base_exp=%llu next=%llu maxbaselv=%d maxbaselv_job=%d blocked_by=%s\n",
+			sd->status.name, sd->status.class_, sd->status.base_level, (unsigned long long)sd->status.base_exp,
+			(unsigned long long)next, pc_is_maxbaselv(sd), pc_maxbaselv(sd),
+			!next ? "next==0" : (sd->status.base_exp < next ? "not_enough_exp" : "is_maxbaselv") );
 		return 0;
+	}
 
 	uint32 base_level = sd->status.base_level;
 

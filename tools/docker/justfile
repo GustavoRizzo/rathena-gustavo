@@ -1,0 +1,49 @@
+# Comandos de conveniência para o servidor rAthena local (single-player).
+# Uso: just -f tools/docker/justfile <receita>
+#
+# Projeto docker compose "ragnarok" (ver "name:" em docker-compose.yml) — os
+# containers ficam agrupados sob esse nome no `docker ps` / Docker Desktop.
+
+compose := "docker compose -f " + justfile_directory() + "/docker-compose.yml -f " + justfile_directory() + "/docker-compose.override.yml"
+# Containers necessários para jogar (não inclui o builder, que só roda sob demanda).
+services := "db login char map web"
+
+db_container := "rathena-db"
+db_user := "ragnarok"
+db_pass := "ragnarok"
+db_name := "ragnarok"
+
+# Lista as receitas disponíveis
+default:
+    @just -f {{justfile_directory()}}/justfile --list
+
+# Para e remove os containers SEM apagar o volume do banco (dados preservados)
+down:
+    {{compose}} down
+
+# Sobe os containers necessários pra jogar (db + login/char/map/web)
+up:
+    {{compose}} up -d {{services}}
+    {{compose}} ps {{services}}
+
+# Reinicia tudo (down + up) sem zerar o banco de dados
+restart: down up
+
+# Mostra o status dos containers do projeto
+ps:
+    {{compose}} ps
+
+# Segue os logs dos servidores
+logs:
+    {{compose}} logs -f {{services}}
+
+# Reseta a posição (last_map/save_map) de TODOS os personagens de TODAS as contas para prontera
+reset-positions map="prontera" x="155" y="185":
+    docker exec {{db_container}} mariadb -u{{db_user}} -p{{db_pass}} {{db_name}} -e \
+        "UPDATE \`char\` SET last_map='{{map}}', last_x={{x}}, last_y={{y}}, save_map='{{map}}', save_x={{x}}, save_y={{y}};"
+    @echo "Todos os personagens foram reposicionados em {{map}} ({{x}},{{y}})."
+
+# Lista personagens existentes (char_id, conta, nome, mapa)
+list-chars:
+    docker exec {{db_container}} mariadb -u{{db_user}} -p{{db_pass}} {{db_name}} -e \
+        "SELECT char_id, account_id, char_num, name, last_map, last_x, last_y FROM \`char\` ORDER BY account_id, char_num;"
